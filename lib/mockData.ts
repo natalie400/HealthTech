@@ -67,3 +67,27 @@ export function getAppointmentsByPatient(patientId: number): Appointment[] {
 export function getAppointmentsByProvider(providerId: number): Appointment[] {
   return mockAppointments.filter(apt => apt.providerId === providerId);
 }
+// Available time slots for booking
+export const availableTimeSlots = [
+  '9:00 AM',
+  '10:00 AM',
+  '11:00 AM',
+  '2:00 PM',
+  '3:00 PM',
+  '4:00 PM',
+];
+
+// Get providers (doctors)
+export function getProviders(): User[] {
+  return mockUsers.filter(user => user.role === 'provider');
+}
+
+// Check if a time slot is available
+export function isSlotAvailable(providerId: number, date: string, time: string): boolean {
+  return !mockAppointments.some(
+    apt => apt.providerId === providerId && 
+           apt.date === date && 
+           apt.time === time &&
+           apt.status === 'booked'
+  );
+}

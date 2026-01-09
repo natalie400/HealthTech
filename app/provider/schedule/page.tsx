@@ -1,0 +1,316 @@
+'use client';
+
+import { useState } from 'react';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
+import { getAppointmentsByProvider, mockAppointments } from '@/lib/mockData';
+import { Appointment } from '@/lib/types';
+
+export default function ProviderSchedule() {
+  const { user } = useAuth();
+  const [selectedDate, setSelectedDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
+  const [view, setView] = useState<'day' | 'week'>('day');
+
+  if (!user) return null;
+
+  // Get provider's appointments
+  const allAppointments = getAppointmentsByProvider(user.id);
+  
+  // Filter by selected date
+  const dayAppointments = allAppointments.filter(
+    apt => apt.date === selectedDate
+  );
+
+  // Get week view data (next 7 days)
+  const getWeekAppointments = () => {
+    const days = [];
+    const today = new Date(selectedDate);
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const dayApts = allAppointments.filter(apt => apt.date === dateStr);
+      
+      days.push({
+        date: dateStr,
+        dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        dayNumber: date.getDate(),
+        appointments: dayApts,
+      });
+    }
+    
+    return days;
+  };
+
+  const weekData = getWeekAppointments();
+
+  // Statistics
+  const stats = {
+    today: dayAppointments.length,
+    thisWeek: allAppointments.filter(apt => {
+      const aptDate = new Date(apt.date);
+      const weekFromNow = new Date();
+      weekFromNow.setDate(weekFromNow.getDate() + 7);
+      return aptDate >= new Date() && aptDate <= weekFromNow;
+    }).length,
+    booked: allAppointments.filter(apt => apt.status === 'booked').length,
+    completed: allAppointments.filter(apt => apt.status === 'completed').length,
+  };
+
+  return (
+    <ProtectedRoute requiredRole="provider">
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              My Schedule
+            </h1>
+            <p className="text-gray-600">
+              Welcome back, {user.name}
+            </p>
+          </div>
+
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Today</p>
+                  <p className="text-3xl font-bold text-blue-600">{stats.today}</p>
+                </div>
+                <div className="text-4xl">📅</div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">This Week</p>
+                  <p className="text-3xl font-bold text-purple-600">{stats.thisWeek}</p>
+                </div>
+                <div className="text-4xl">📊</div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Booked</p>
+                  <p className="text-3xl font-bold text-green-600">{stats.booked}</p>
+                </div>
+                <div className="text-4xl">✓</div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Completed</p>
+                  <p className="text-3xl font-bold text-gray-600">{stats.completed}</p>
+                </div>
+                <div className="text-4xl">✔️</div>
+              </div>
+            </div>
+          </div>
+
+          {/* View Toggle & Date Picker */}
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              {/* View Toggle */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setView('day')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    view === 'day'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Day View
+                </button>
+                <button
+                  onClick={() => setView('week')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    view === 'week'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Week View
+                </button>
+              </div>
+
+              {/* Date Picker */}
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => {
+                    const date = new Date(selectedDate);
+                    date.setDate(date.getDate() - 1);
+                    setSelectedDate(date.toISOString().split('T')[0]);
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  ← Previous
+                </button>
+                
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                
+                <button
+                  onClick={() => {
+                    const date = new Date(selectedDate);
+                    date.setDate(date.getDate() + 1);
+                    setSelectedDate(date.toISOString().split('T')[0]);
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Next →
+                </button>
+
+                <button
+                  onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                >
+                  Today
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Day View */}
+          {view === 'day' && (
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {new Date(selectedDate).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {dayAppointments.length} appointment{dayAppointments.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+
+              <div className="p-6">
+                {dayAppointments.length > 0 ? (
+                  <div className="space-y-4">
+                    {dayAppointments.map(apt => (
+                      <AppointmentItem key={apt.id} appointment={apt} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">📭</div>
+                    <p className="text-gray-600 text-lg">No appointments scheduled</p>
+                    <p className="text-gray-500 text-sm mt-2">Enjoy your free time!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Week View */}
+          {view === 'week' && (
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+              {weekData.map((day) => (
+                <div
+                  key={day.date}
+                  className={`bg-white rounded-lg shadow overflow-hidden ${
+                    day.date === selectedDate ? 'ring-2 ring-blue-500' : ''
+                  }`}
+                >
+                  <div className="bg-gray-50 p-3 border-b border-gray-200">
+                    <p className="text-xs font-medium text-gray-600">{day.dayName}</p>
+                    <p className="text-2xl font-bold text-gray-900">{day.dayNumber}</p>
+                  </div>
+                  
+                  <div className="p-3">
+                    {day.appointments.length > 0 ? (
+                      <div className="space-y-2">
+                        {day.appointments.map(apt => (
+                          <div
+                            key={apt.id}
+                            className="text-xs p-2 bg-blue-50 border border-blue-200 rounded"
+                          >
+                            <p className="font-medium text-blue-900">{apt.time}</p>
+                            <p className="text-blue-700 truncate">{apt.patientName}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 text-center py-4">No appointments</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </ProtectedRoute>
+  );
+}
+
+// Appointment Item Component
+function AppointmentItem({ appointment }: { appointment: Appointment }) {
+  const [status, setStatus] = useState(appointment.status);
+
+  const statusColors = {
+    booked: 'bg-green-100 text-green-800 border-green-200',
+    completed: 'bg-gray-100 text-gray-800 border-gray-200',
+    cancelled: 'bg-red-100 text-red-800 border-red-200',
+  };
+
+  const handleStatusChange = (newStatus: 'booked' | 'completed' | 'cancelled') => {
+    setStatus(newStatus);
+    // In real app, this would call API
+    console.log(`Updated appointment ${appointment.id} to ${newStatus}`);
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg font-semibold text-gray-900">{appointment.time}</span>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium border ${statusColors[status]}`}>
+              {status}
+            </span>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900">{appointment.patientName}</h3>
+          <p className="text-sm text-gray-600 mt-1">{appointment.reason}</p>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      {status === 'booked' && (
+        <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200">
+          <button
+            onClick={() => handleStatusChange('completed')}
+            className="flex-1 px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Mark Complete
+          </button>
+          <button
+            onClick={() => handleStatusChange('cancelled')}
+            className="flex-1 px-3 py-2 bg-white border border-red-600 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

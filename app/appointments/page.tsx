@@ -3,8 +3,9 @@ import { useState } from 'react';
 import AppointmentCard from '@/components/AppointmentCard';
 import { getAppointmentsByPatient } from '@/lib/mockData';
 import { Appointment } from '@/lib/types';
-
+import ProtectedRoute  from '@/components/ProtectedRoute';
 export default function Appointments() {
+  
   // Get all appointments for patient 1
   const allAppointments = getAppointmentsByPatient(1);
   
@@ -36,6 +37,7 @@ export default function Appointments() {
   });
 
   return (
+    <ProtectedRoute>
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">
@@ -118,5 +120,6 @@ export default function Appointments() {
         )}
       </div>
     </div>
+    </ProtectedRoute>
   );
 }
