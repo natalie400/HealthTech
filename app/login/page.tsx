@@ -133,15 +133,6 @@ export default function Login() {
             </button>
           </div>
 
-          {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <p className="text-xs font-semibold text-gray-700 mb-2">Demo Credentials:</p>
-            <div className="text-xs text-gray-600 space-y-1">
-              <p><strong>Patient:</strong> john@example.com</p>
-              <p><strong>Provider:</strong> sarah@clinic.com</p>
-              <p><strong>Password:</strong> password123</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>

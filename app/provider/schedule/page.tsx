@@ -7,6 +7,8 @@ import { getAppointmentsByProvider, mockAppointments } from '@/lib/mockData';
 import { Appointment } from '@/lib/types';
 
 export default function ProviderSchedule() {
+    // Privacy mode state
+    const [privacyMode, setPrivacyMode] = useState(false);
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
@@ -73,6 +75,18 @@ export default function ProviderSchedule() {
             <p className="text-gray-600">
               Welcome back, {user.name}
             </p>
+            {/* Privacy Toggle */}
+            <div className="mt-4 flex items-center gap-2">
+              <label htmlFor="privacy-toggle" className="text-sm font-medium text-gray-700">Privacy Mode</label>
+              <input
+                id="privacy-toggle"
+                type="checkbox"
+                checked={privacyMode}
+                onChange={() => setPrivacyMode((v) => !v)}
+                className="accent-blue-600 h-4 w-4"
+              />
+              <span className="text-xs text-gray-500">{privacyMode ? 'ON (names hidden)' : 'OFF (names visible)'}</span>
+            </div>
           </div>
 
           {/* Statistics Cards */}
@@ -235,7 +249,6 @@ export default function ProviderSchedule() {
                     <p className="text-xs font-medium text-gray-600">{day.dayName}</p>
                     <p className="text-2xl font-bold text-gray-900">{day.dayNumber}</p>
                   </div>
-                  
                   <div className="p-3">
                     {day.appointments.length > 0 ? (
                       <div className="space-y-2">
@@ -245,7 +258,9 @@ export default function ProviderSchedule() {
                             className="text-xs p-2 bg-blue-50 border border-blue-200 rounded"
                           >
                             <p className="font-medium text-blue-900">{apt.time}</p>
-                            <p className="text-blue-700 truncate">{apt.patientName}</p>
+                            <p className={`text-blue-700 truncate ${privacyMode ? 'blur-sm select-none' : ''}`}>
+                              {privacyMode ? `Patient #${apt.patientId || apt.id}` : apt.patientName}
+                            </p>
                           </div>
                         ))}
                       </div>
