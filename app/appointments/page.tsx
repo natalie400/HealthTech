@@ -1,13 +1,16 @@
 'use client';
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import AppointmentCard from '@/components/AppointmentCard';
 import { getAppointmentsByPatient } from '@/lib/mockData';
 import { Appointment } from '@/lib/types';
 import ProtectedRoute  from '@/components/ProtectedRoute';
 export default function Appointments() {
   
-  // Get all appointments for patient 1
-  const allAppointments = getAppointmentsByPatient(1);
+  // Get current user
+  const { user } = useAuth();
+  // Get all appointments for the logged-in patient
+  const allAppointments = user ? getAppointmentsByPatient(user.id) : [];
   
   // State for search and filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,7 +52,7 @@ export default function Appointments() {
           <div className="grid gap-4 md:grid-cols-3">
             {/* Search Input */}
             <div>
-              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="search" className="block text-sm font-medium text-gray-900 mb-2">
                 Search
               </label>
               <input
@@ -58,20 +61,20 @@ export default function Appointments() {
                 placeholder="Search by provider or reason..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400"
               />
             </div>
 
             {/* Status Filter */}
             <div>
-              <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="status" className="block text-sm font-medium text-gray-900 mb-2">
                 Filter by Status
               </label>
               <select
                 id="status"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               >
                 <option value="all">All Statuses</option>
                 <option value="booked">Booked</option>
@@ -82,14 +85,14 @@ export default function Appointments() {
 
             {/* Sort By */}
             <div>
-              <label htmlFor="sort" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="sort" className="block text-sm font-medium text-gray-900 mb-2">
                 Sort By
               </label>
               <select
                 id="sort"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'date' | 'provider')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               >
                 <option value="date">Date (Newest First)</option>
                 <option value="provider">Provider Name (A-Z)</option>
@@ -98,7 +101,7 @@ export default function Appointments() {
           </div>
 
           {/* Results Count */}
-          <div className="mt-4 text-sm text-gray-600">
+          <div className="mt-4 text-sm text-gray-900">
             Showing {sortedAppointments.length} of {allAppointments.length} appointments
           </div>
         </div>
@@ -112,8 +115,8 @@ export default function Appointments() {
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow p-12 text-center">
-            <p className="text-gray-600 text-lg">No appointments found</p>
-            <p className="text-gray-500 text-sm mt-2">
+            <p className="text-gray-900 text-lg">No appointments found</p>
+            <p className="text-gray-700 text-sm mt-2">
               Try adjusting your search or filters
             </p>
           </div>
