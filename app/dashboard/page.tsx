@@ -9,6 +9,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import SkeletonCard from '@/components/SkeletonCard';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import Link from 'next/link';
+import { CalendarDays, CheckCircle2, BarChart2 } from 'lucide-react';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -94,36 +95,30 @@ export default function Dashboard() {
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-blue-100 text-sm mb-1">Upcoming</p>
-                    <p className="text-4xl font-bold">{upcomingAppointments.length}</p>
-                  </div>
-                  <div className="text-5xl opacity-50">📅</div>
+              <div className="bg-white text-gray-900 rounded-lg shadow-lg p-6 flex items-center justify-between border border-gray-200">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Upcoming</p>
+                  <p className="text-3xl font-bold">{upcomingAppointments.length}</p>
                 </div>
+                <CalendarDays className="w-10 h-10 text-blue-500 opacity-80" />
               </div>
 
-              <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-green-100 text-sm mb-1">Completed</p>
-                    <p className="text-4xl font-bold">
-                      {appointments.filter(apt => apt.status === 'completed').length}
-                    </p>
-                  </div>
-                  <div className="text-5xl opacity-50">✓</div>
+              <div className="bg-white text-gray-900 rounded-lg shadow-lg p-6 flex items-center justify-between border border-gray-200">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Completed</p>
+                  <p className="text-3xl font-bold">
+                    {appointments.filter(apt => apt.status === 'completed').length}
+                  </p>
                 </div>
+                <CheckCircle2 className="w-10 h-10 text-green-500 opacity-80" />
               </div>
 
-              <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-purple-100 text-sm mb-1">Total</p>
-                    <p className="text-4xl font-bold">{appointments.length}</p>
-                  </div>
-                  <div className="text-5xl opacity-50">📊</div>
+              <div className="bg-white text-gray-900 rounded-lg shadow-lg p-6 flex items-center justify-between border border-gray-200">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Total</p>
+                  <p className="text-3xl font-bold">{appointments.length}</p>
                 </div>
+                <BarChart2 className="w-10 h-10 text-purple-500 opacity-80" />
               </div>
             </div>
 
