@@ -49,34 +49,34 @@ export default function Appointments() {
 
         {/* Search and Filter Controls */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3 items-center">
             {/* Search Input */}
             <div>
-              <label htmlFor="search" className="block text-sm font-medium text-gray-900 mb-2">
+              <label htmlFor="search" className="block text-xs font-semibold text-gray-700 mb-1">
                 Search
               </label>
               <input
                 id="search"
                 type="text"
-                placeholder="Search by provider or reason..."
+                placeholder="Provider or reason..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+                className="w-full px-2 py-1 border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-400 focus:border-transparent text-gray-900 placeholder-gray-400 text-xs"
               />
             </div>
 
             {/* Status Filter */}
             <div>
-              <label htmlFor="status" className="block text-sm font-medium text-gray-900 mb-2">
-                Filter by Status
+              <label htmlFor="status" className="block text-xs font-semibold text-gray-700 mb-1">
+                Status
               </label>
               <select
                 id="status"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                className="w-full px-2 py-1 border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-400 focus:border-transparent text-gray-900 text-xs"
               >
-                <option value="all">All Statuses</option>
+                <option value="all">All</option>
                 <option value="booked">Booked</option>
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
@@ -85,17 +85,17 @@ export default function Appointments() {
 
             {/* Sort By */}
             <div>
-              <label htmlFor="sort" className="block text-sm font-medium text-gray-900 mb-2">
-                Sort By
+              <label htmlFor="sort" className="block text-xs font-semibold text-gray-700 mb-1">
+                Sort
               </label>
               <select
                 id="sort"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'date' | 'provider')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                className="w-full px-2 py-1 border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-400 focus:border-transparent text-gray-900 text-xs"
               >
-                <option value="date">Date (Newest First)</option>
-                <option value="provider">Provider Name (A-Z)</option>
+                <option value="date">Date</option>
+                <option value="provider">Provider</option>
               </select>
             </div>
           </div>
