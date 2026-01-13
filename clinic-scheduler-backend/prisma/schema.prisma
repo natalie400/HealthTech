@@ -1,0 +1,46 @@
+// Prisma Schema for Clinic Appointment Scheduler
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+ 
+}
+
+// User model (both patients and providers)
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   // "patient" or "provider"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  patientAppointments  Appointment[] @relation("PatientAppointments")
+  providerAppointments Appointment[] @relation("ProviderAppointments")
+
+  @@map("users")
+}
+
+// Appointment model
+model Appointment {
+  id         Int      @id @default(autoincrement())
+  patientId  Int
+  providerId Int
+  date       DateTime
+  time       String
+  status     String   // "booked", "cancelled", "completed"
+  reason     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  patient  User @relation("PatientAppointments", fields: [patientId], references: [id], onDelete: Cascade)
+  provider User @relation("ProviderAppointments", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@map("appointments")
+}
