@@ -1,8 +1,4 @@
 {
-<<<<<<< HEAD
-  "dependencies": {
-    "@prisma/client": "^7.2.0"
-=======
   "name": "clinic-scheduler",
   "version": "0.1.0",
   "private": true,
@@ -30,6 +26,5 @@
     "eslint-config-next": "16.1.1",
     "tailwindcss": "^4",
     "typescript": "^5"
->>>>>>> 301c0e0af09abeb2a70a8acd4d45584aa7924ebf
   }
 }
