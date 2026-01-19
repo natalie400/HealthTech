@@ -1,16 +1,18 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import appointmentRoutes from './routes/appointmentRoutes';
+import authRoutes from './routes/authRoutes';
+import userRoutes from './routes/userRoutes';
 
-// Load environment variables
 dotenv.config();
 
 const app: Application = express();
 
-// Middleware stack 
-app.use(cors()); // Allow frontend to connect
-app.use(express.json()); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Health check route
 app.get('/health', (req: Request, res: Response) => {
@@ -28,10 +30,17 @@ app.get('/', (req: Request, res: Response) => {
     version: '1.0.0',
     endpoints: {
       health: '/health',
-      api: '/api'
+      auth: '/api/auth',
+      users: '/api/users',
+      appointments: '/api/appointments',
     }
   });
 });
+
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/appointments', appointmentRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

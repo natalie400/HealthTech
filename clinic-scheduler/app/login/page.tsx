@@ -13,11 +13,11 @@ export default function Login() {
   const { login } = useAuth();
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    const success = login(email, password);
+    const success = await login(email, password);
     
     if (success) {
       router.push('/dashboard');
@@ -27,14 +27,14 @@ export default function Login() {
   };
 
   // Quick login buttons for demo
-  const quickLogin = (role: 'patient' | 'provider') => {
+  const quickLogin = async (role: 'patient' | 'provider') => {
     const email = role === 'patient' ? 'john@example.com' : 'sarah@clinic.com';
     setEmail(email);
     setPassword('password123');
-    
+
     // Auto submit after setting values
-    setTimeout(() => {
-      const success = login(email, 'password123');
+    setTimeout(async () => {
+      const success = await login(email, 'password123');
       if (success) {
         router.push('/dashboard');
       }
@@ -59,7 +59,7 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-100 mb-2">
                 Email Address
               </label>
               <input
@@ -68,7 +68,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 text-base font-medium font-sans placeholder-gray-400"
                 placeholder="your@email.com"
               />
             </div>
@@ -84,7 +84,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 text-base font-medium font-sans placeholder-gray-400"
                 placeholder="••••••••"
               />
             </div>
