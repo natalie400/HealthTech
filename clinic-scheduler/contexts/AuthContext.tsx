@@ -2,11 +2,11 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '@/lib/types';
-import { mockUsers } from '@/lib/mockData';
+import { authAPI } from '@/lib/api';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -17,37 +17,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load user from localStorage on mount
+  // Load user from token on mount
   useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (error) {
-        console.error('Error loading user:', error);
+    const loadUser = async () => {
+      const token = localStorage.getItem('token');
+      
+      if (token) {
+        try {
+          const response = await authAPI.getCurrentUser();
+          if (response.success && response.data) {
+            setUser(response.data);
+          }
+        } catch (error) {
+          console.error('Error loading user:', error);
+          localStorage.removeItem('token');
+        }
       }
-    }
-    setIsLoading(false);
+      
+      setIsLoading(false);
+    };
+
+    loadUser();
   }, []);
 
-  // Login function (mock authentication)
-  const login = (email: string, password: string): boolean => {
-    // In real app, this would call an API
-    const foundUser = mockUsers.find(u => u.email === email);
-    
-    if (foundUser && password === 'password123') {
-      setUser(foundUser);
-      localStorage.setItem('currentUser', JSON.stringify(foundUser));
-      return true;
+  // Login function - calls real API
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const response = await authAPI.login(email, password);
+      
+      if (response.success && response.data?.user) {
+        setUser(response.data.user);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
     }
-    
-    return false;
   };
 
   // Logout function
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('currentUser');
+    authAPI.logout();
   };
 
   return (

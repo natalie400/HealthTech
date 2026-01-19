@@ -4,8 +4,13 @@ import jwt from 'jsonwebtoken';
 import prisma from '../utils/db';
 import { RegisterDto, LoginDto } from '../types';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET as string;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+
+if (!JWT_SECRET) {
+  console.error('❌ FATAL ERROR: JWT_SECRET is not defined');
+  process.exit(1);
+}
 
 // POST /api/auth/register - Register new user
 export const register = async (req: Request, res: Response) => {
@@ -53,7 +58,7 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
-    // Generate JWT token
+    // Generate JWT token - FIXED VERSION
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       JWT_SECRET,
@@ -118,7 +123,7 @@ export const login = async (req: Request, res: Response) => {
       });
     }
 
-    // Generate JWT token
+    // Generate JWT token - FIXED VERSION
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       JWT_SECRET,
@@ -148,10 +153,9 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
-// GET /api/auth/me - Get current user (requires authentication)
+// GET /api/auth/me - Get current user
 export const getCurrentUser = async (req: Request, res: Response) => {
   try {
-    // User ID is attached by auth middleware
     const userId = (req as any).userId;
 
     const user = await prisma.user.findUnique({
