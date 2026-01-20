@@ -1,7 +1,7 @@
-// API Base URL - use local backend for now
+// API Base URL - The address of the kitchen
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-// Helper function to get token from localStorage
+// Helper: Check pocket for the VIP Pass (Token)
 const getToken = (): string | null => {
   if (typeof window !== 'undefined') {
     return localStorage.getItem('token');
@@ -9,19 +9,22 @@ const getToken = (): string | null => {
   return null;
 };
 
-// Helper function to make authenticated requests
+// THE MAIN CONNECTOR FUNCTION
 async function fetchWithAuth(url: string, options: RequestInit = {}) {
   const token = getToken();
   
-  const headers: HeadersInit = {
+  // FIX: We tell TypeScript this is a simple Key-Value object
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
+    ...(options.headers as Record<string, string>),
   };
 
+  // If we have a pass, staple it to the order
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  // Make the actual call
   const response = await fetch(`${API_URL}${url}`, {
     ...options,
     headers,
@@ -36,9 +39,10 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
   return data;
 }
 
-// Auth API
+// Auth API - Login/Register
 export const authAPI = {
   login: async (email: string, password: string) => {
+    // This is the specific call to the 'Login Station'
     const response = await fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -51,7 +55,7 @@ export const authAPI = {
       throw new Error(data.message || 'Login failed');
     }
 
-    // Store token
+    // Save the token for future use
     if (data.data?.token) {
       localStorage.setItem('token', data.data.token);
     }
@@ -72,7 +76,6 @@ export const authAPI = {
       throw new Error(data.message || 'Registration failed');
     }
 
-    // Store token
     if (data.data?.token) {
       localStorage.setItem('token', data.data.token);
     }
@@ -89,7 +92,7 @@ export const authAPI = {
   },
 };
 
-// Appointments API
+// Appointments API - Managed requests using our connector
 export const appointmentsAPI = {
   getAll: async (params?: { patientId?: number; providerId?: number; status?: string }) => {
     const queryParams = new URLSearchParams();
@@ -139,24 +142,13 @@ export const appointmentsAPI = {
   },
 };
 
-// Users API
 export const usersAPI = {
   getProviders: async () => {
     const response = await fetch(`${API_URL}/api/users/providers`);
     const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to fetch providers');
-    }
-
+    if (!response.ok) throw new Error(data.message || 'Failed to fetch providers');
     return data;
   },
-
-  getAll: async () => {
-    return fetchWithAuth('/api/users');
-  },
-
-  getById: async (id: number) => {
-    return fetchWithAuth(`/api/users/${id}`);
-  },
+  getAll: async () => { return fetchWithAuth('/api/users'); },
+  getById: async (id: number) => { return fetchWithAuth(`/api/users/${id}`); },
 };

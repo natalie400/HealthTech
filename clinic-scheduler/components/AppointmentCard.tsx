@@ -1,63 +1,58 @@
-'use client';
-
-import { useState } from 'react';
 import { Appointment } from '@/lib/types';
-import AppointmentModal from './AppointmentModal';
+import { Calendar, Clock, Eye } from 'lucide-react';
 
 interface AppointmentCardProps {
   appointment: Appointment;
+  onClick: (appointment: Appointment) => void;
 }
 
-export default function AppointmentCard({ appointment }: AppointmentCardProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
+export default function AppointmentCard({ appointment, onClick }: AppointmentCardProps) {
+  
   const statusColors = {
-    booked: 'bg-gradient-to-r from-green-200 via-green-100 to-white text-green-900 border-green-300',
-    cancelled: 'bg-gradient-to-r from-red-200 via-red-100 to-white text-red-900 border-red-300',
-    completed: 'bg-gradient-to-r from-gray-200 via-gray-100 to-white text-gray-900 border-gray-300',
+    booked: 'bg-green-100 text-green-800 border-green-200',
+    completed: 'bg-blue-100 text-blue-800 border-blue-200',
+    cancelled: 'bg-red-100 text-red-800 border-red-200',
   };
 
   return (
-    <>
-      <div
-        onClick={() => setIsModalOpen(true)}
-        className="backdrop-blur-lg bg-white/70 border border-gray-100 rounded-xl p-2 shadow-sm hover:shadow-md transition-all cursor-pointer hover:border-blue-400 relative overflow-hidden min-h-[90px] max-w-xs w-full mx-auto"
-      >
-        {/* Decorative gradient accent */}
-        <div className="absolute top-0 right-0 w-12 h-12 bg-gradient-to-br from-blue-100 via-transparent to-transparent rounded-bl-xl pointer-events-none" />
-        <div className="flex justify-between items-start mb-2">
+    <div 
+      onClick={() => onClick(appointment)}
+      className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-all duration-200 cursor-pointer group"
+    >
+      {/* Header */}
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex items-center gap-2 text-gray-900 font-semibold">
+          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
+            <Calendar className="w-5 h-5" />
+          </div>
           <div>
-            <h3 className="font-bold text-base text-gray-900 tracking-tight mb-0 flex items-center gap-2">
-              <span className="inline-block w-6 h-6 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 text-sm shadow mr-1">👨‍⚕️</span>
-              {appointment.providerName}
-            </h3>
-            <p className="text-xs text-gray-500 italic mb-0">{appointment.reason}</p>
-          </div>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusColors[appointment.status]} shadow-sm uppercase tracking-wide`}>
-            {appointment.status}
-          </span>
-        </div>
-        <div className="flex gap-3 text-xs text-gray-700 mt-1">
-          <div className="flex items-center gap-1">
-            <span className="text-blue-500 text-sm">📅</span>
-            <span className="font-medium">{appointment.date}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-blue-500 text-sm">🕐</span>
-            <span className="font-medium">{appointment.time}</span>
+            <p>{new Date(appointment.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+            <div className="flex items-center gap-1 text-xs text-gray-500 font-normal">
+              <Clock className="w-3 h-3" />
+              {appointment.time}
+            </div>
           </div>
         </div>
-        {/* Click indicator */}
-        <div className="mt-2 pt-2 border-t border-gray-200 flex justify-end">
-          <p className="text-[10px] text-blue-700 font-semibold tracking-wide">View details →</p>
-        </div>
+        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${statusColors[appointment.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'}`}>
+          {appointment.status.toUpperCase()}
+        </span>
       </div>
-      {/* Modal */}
-      <AppointmentModal
-        appointment={appointment}
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
-    </>
+
+      {/* Body */}
+      <div>
+        <h3 className="text-lg font-bold text-gray-900 mb-1">
+          {appointment.providerName || appointment.patientName}
+        </h3>
+        <p className="text-sm text-gray-600 line-clamp-2">
+          {appointment.reason}
+        </p>
+      </div>
+
+      <div className="mt-4 flex justify-end">
+        <span className="text-sm text-blue-600 font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          View Details <Eye className="w-4 h-4" />
+        </span>
+      </div>
+    </div>
   );
 }

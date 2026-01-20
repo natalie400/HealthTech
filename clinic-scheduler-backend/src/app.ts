@@ -1,5 +1,5 @@
 import express, { Application, Request, Response } from 'express';
-import cors from 'cors';
+import cors from 'cors'; // The "Bouncer"
 import dotenv from 'dotenv';
 import appointmentRoutes from './routes/appointmentRoutes';
 import authRoutes from './routes/authRoutes';
@@ -9,21 +9,25 @@ dotenv.config();
 
 const app: Application = express();
 
-// Middleware
-app.use(cors());
+// 1. THE CONNECTION CONFIGURATION
+// We explicitly allow the Frontend URL to send cookies and data.
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000', 
+  credentials: true 
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check route
+// Health check (To see if the kitchen is open)
 app.get('/health', (req: Request, res: Response) => {
   res.json({ 
-    status: 'OK',
+    status: 'OK', 
     message: 'Clinic Scheduler API is running',
     timestamp: new Date().toISOString()
   });
 });
 
-// Root route
 app.get('/', (req: Request, res: Response) => {
   res.json({ 
     message: 'Welcome to Clinic Scheduler API',
@@ -37,12 +41,12 @@ app.get('/', (req: Request, res: Response) => {
   });
 });
 
-// API Routes
+// Routes (The Stations in the Kitchen)
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/appointments', appointmentRoutes);
 
-// 404 handler
+// 404 handler (If they order something not on the menu)
 app.use((req: Request, res: Response) => {
   res.status(404).json({ 
     error: 'Not Found',
