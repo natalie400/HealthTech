@@ -1,5 +1,5 @@
 import express, { Application, Request, Response } from 'express';
-import cors from 'cors'; // The "Bouncer"
+import cors from 'cors'; 
 import dotenv from 'dotenv';
 import appointmentRoutes from './routes/appointmentRoutes';
 import authRoutes from './routes/authRoutes';
