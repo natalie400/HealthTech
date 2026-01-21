@@ -146,6 +146,7 @@ export default function BookAppointment() {
               <p className="text-blue-100 mt-2">
                 Schedule a visit with one of our specialists.
               </p>
+
             </div>
 
             {/* Form */}

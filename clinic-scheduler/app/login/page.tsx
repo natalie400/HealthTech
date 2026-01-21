@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import Link from 'next/dist/client/link';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -49,7 +50,7 @@ export default function Login() {
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Clinic Scheduler
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-800">
             Sign in to manage your appointments
           </p>
         </div>
@@ -59,7 +60,7 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-100 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-2">
                 Email Address
               </label>
               <input
@@ -75,7 +76,7 @@ export default function Login() {
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-2">
                 Password
               </label>
               <input
@@ -85,7 +86,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 text-base font-medium font-sans placeholder-gray-400"
-                placeholder="••••••••"
+                placeholder=" "
               />
             </div>
 
@@ -133,6 +134,15 @@ export default function Login() {
             </button>
           </div>
 
+          {/* Sign Up Link */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-800">
+              Don't have an account?{' '}
+              <Link href="/register" className="text-blue-600 font-semibold hover:text-blue-700">
+                Sign Up
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -34,6 +34,20 @@ export default function Home(){
             Get Started
           </Link>
         </div>
+        <div className="flex gap-4 justify-center">
+  <Link
+    href="/login"
+    className="inline-block px-8 py-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl"
+  >
+    Sign In
+  </Link>
+  <Link
+    href="/register"
+    className="inline-block px-8 py-4 bg-white border-2 border-blue-600 text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition-colors shadow-lg hover:shadow-xl"
+  >
+    Sign Up
+  </Link>
+</div>
 
         {/* Features */}
         <div className="grid md:grid-cols-3 gap-8 mt-16">
