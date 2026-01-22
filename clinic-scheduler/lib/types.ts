@@ -15,6 +15,6 @@ export interface Appointment {
   providerName: string;
   date: string;
   time: string;
-  status: 'booked' | 'cancelled' | 'completed';
+  status: 'booked' | 'cancelled' | 'completed'|'blocked';
   reason: string;
 }

@@ -1,15 +1,14 @@
-
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { appointmentsAPI, usersAPI } from '@/lib/api';
+import { appointmentsAPI, usersAPI } from '@/lib/api'; // REVERTED to usersAPI
 import ProtectedRoute from '@/components/ProtectedRoute';
-import toast from 'react-hot-toast'; // Using the standard toast library
+import toast from 'react-hot-toast';
 import { Calendar, Clock, User, FileText, Loader2 } from 'lucide-react';
 
 // --- 1. VALIDATION SCHEMA ---
@@ -30,8 +29,11 @@ type Provider = {
   email: string;
 };
 
-export default function BookAppointment() {
+function BookingForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preSelectedProviderId = searchParams.get('providerId');
+
   const { user } = useAuth();
   
   // State for data
@@ -44,33 +46,41 @@ export default function BookAppointment() {
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
+    defaultValues: {
+      providerId: preSelectedProviderId || '',
+    }
   });
 
-  // Watch values for auto-save and UI logic
   const formValues = watch();
   const watchProvider = watch('providerId');
   const watchDate = watch('date');
 
-  // --- 3. AUTO-SAVE LOGIC ---
-  // Load Draft
+  // --- 3. AUTO-SAVE & URL PRE-SELECT LOGIC ---
   const hasLoadedDraft = useRef(false);
   useEffect(() => {
     if (hasLoadedDraft.current) return;
     hasLoadedDraft.current = true;
-    const savedDraft = localStorage.getItem('bookingDraft');
-    if (savedDraft) {
-      try {
-        const draft = JSON.parse(savedDraft);
-        reset(draft);
-        toast('Draft loaded from previous session', { icon: '📝' });
-      } catch (error) {
-        // ignore invalid draft
+    
+    // Priority: 1. URL Param, 2. Local Storage Draft
+    if (preSelectedProviderId) {
+       setValue('providerId', preSelectedProviderId);
+    } else {
+      const savedDraft = localStorage.getItem('bookingDraft');
+      if (savedDraft) {
+        try {
+          const draft = JSON.parse(savedDraft);
+          reset(draft);
+          toast('Draft loaded', { icon: '📝' });
+        } catch (error) {
+          // ignore invalid draft
+        }
       }
     }
-  }, [reset]);
+  }, [reset, preSelectedProviderId, setValue]);
 
   // Save Draft
   useEffect(() => {
@@ -78,18 +88,33 @@ export default function BookAppointment() {
       if (formValues && Object.values(formValues).some(v => v)) {
         localStorage.setItem('bookingDraft', JSON.stringify(formValues));
       }
-    }, 1000); // Save after 1 second of inactivity
+    }, 1000);
     return () => clearTimeout(timeoutId);
   }, [formValues]);
 
-  // --- 4. FETCH DATA ---
+  // --- 4. FETCH DATA (ROBUST FIX) ---
   useEffect(() => {
     async function fetchProviders() {
       try {
+        // Reverted to usersAPI
         const response = await usersAPI.getProviders();
-        const doctorList = Array.isArray(response) ? response : (response.data || []);
+        
+        // SAFETY CHECK: Handle different API response structures
+        // Some APIs return [ ... ] and others return { data: [ ... ] }
+        let doctorList: Provider[] = [];
+        
+        if (Array.isArray(response)) {
+            doctorList = response;
+        } else if (response && Array.isArray(response.data)) {
+            doctorList = response.data;
+        } else {
+            console.warn('Unexpected provider data format:', response);
+            doctorList = [];
+        }
+
         setProviders(doctorList);
       } catch (error) {
+        console.error("Error fetching providers:", error);
         toast.error('Could not load list of doctors');
       } finally {
         setIsPageLoading(false);
@@ -102,34 +127,48 @@ export default function BookAppointment() {
   const onSubmit = async (data: BookingFormData) => {
     if (!user) {
       toast.error('You must be logged in');
+      router.push('/login');
       return;
     }
 
     try {
+      // Ensure providerId is a valid number
+      const pid = parseInt(data.providerId);
+      if (isNaN(pid)) {
+          toast.error("Invalid Provider Selected");
+          return;
+      }
+
       await appointmentsAPI.create({
         patientId: user.id,
-        providerId: parseInt(data.providerId),
+        providerId: pid,
         date: data.date,
         time: data.time,
         reason: data.reason,
+        status: 'booked'
       });
 
-      // Cleanup
       localStorage.removeItem('bookingDraft');
       toast.success('Appointment booked successfully!');
       router.push('/dashboard');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to book appointment');
+      // Specific handling for blocked/double-booked slots
+      if (error.response?.status === 409) {
+        toast.error('This time slot is unavailable. Please choose another.');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to book appointment');
+      }
     }
   };
 
-  // Date helpers
+  // Helpers
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const minDate = tomorrow.toISOString().split('T')[0];
-
-  // Static time slots (can be made dynamic later)
   const timeSlots = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00'];
+
+  // Helper to find selected doctor name (Safe check)
+  const selectedDoctor = providers.find(p => p.id.toString() === watchProvider);
 
   return (
     <ProtectedRoute requiredRole="patient">
@@ -137,7 +176,7 @@ export default function BookAppointment() {
         <div className="max-w-2xl mx-auto">
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
             
-            {/* Header - EXACT ORIGINAL DESIGN */}
+            {/* Header */}
             <div className="bg-blue-600 px-8 py-6">
               <h1 className="text-2xl font-bold text-white flex items-center gap-2">
                 <Calendar className="w-6 h-6" />
@@ -169,18 +208,25 @@ export default function BookAppointment() {
                       <option value="">-- Choose a Specialist --</option>
                       {providers.map((doctor) => (
                         <option key={doctor.id} value={doctor.id}>
-                          {doctor.name}
+                          Dr. {doctor.name}
                         </option>
                       ))}
                     </select>
-                    {/* Error Message */}
+                    
+                    {preSelectedProviderId && selectedDoctor && (
+                        <p className="text-xs text-green-600 mt-1 font-medium flex items-center gap-1">
+                            ✓ Pre-selected: Dr. {selectedDoctor.name}
+                        </p>
+                    )}
+
                     {errors.providerId && (
                       <p className="text-xs text-red-500 mt-1">{errors.providerId.message}</p>
                     )}
                   </>
                 )}
-                {providers.length === 0 && !isPageLoading && (
-                  <p className="text-xs text-red-500 mt-1">No doctors found. Please contact support.</p>
+                {/* Only show error if finished loading and no providers found */}
+                {!isPageLoading && providers.length === 0 && (
+                  <p className="text-xs text-red-500 mt-1">No doctors found. Please try refreshing.</p>
                 )}
               </div>
 
@@ -260,7 +306,6 @@ export default function BookAppointment() {
                   )}
                 </button>
 
-                {/* Clear Draft Button (Optional but helpful) */}
                 <button
                     type="button"
                     onClick={() => {
@@ -274,7 +319,6 @@ export default function BookAppointment() {
                 </button>
               </div>
 
-              {/* Auto-save Indicator */}
               {Object.values(formValues || {}).some(v => v) && (
                 <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
                   <span>💾</span>
@@ -285,7 +329,6 @@ export default function BookAppointment() {
             </form>
           </div>
           
-          {/* OPTIONAL: Info Section (Matches your UI style) */}
           <div className="mt-8 bg-blue-50 border border-blue-100 rounded-xl p-6">
             <h3 className="text-blue-900 font-semibold mb-2 flex items-center gap-2">
               <span className="text-xl">ℹ️</span> Booking Guidelines
@@ -303,3 +346,18 @@ export default function BookAppointment() {
   );
 }
 
+// WRAPPER COMPONENT to handle Suspense (Required for useSearchParams)
+export default function BookAppointmentPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <p className="text-gray-500 font-medium">Loading...</p>
+        </div>
+      </div>
+    }>
+      <BookingForm />
+    </Suspense>
+  );
+}
