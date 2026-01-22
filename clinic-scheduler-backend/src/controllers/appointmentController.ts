@@ -27,18 +27,10 @@ export const getAllAppointments = async (req: Request, res: Response) => {
       where,
       include: {
         patient: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          select: { id: true, name: true, email: true },
         },
         provider: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          select: { id: true, name: true, email: true },
         },
       },
       orderBy: {
@@ -85,18 +77,10 @@ export const getAppointmentById = async (req: Request, res: Response) => {
       where: { id: Number(id) },
       include: {
         patient: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          select: { id: true, name: true, email: true },
         },
         provider: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          select: { id: true, name: true, email: true },
         },
       },
     });
@@ -136,10 +120,13 @@ export const getAppointmentById = async (req: Request, res: Response) => {
   }
 };
 
-// POST /api/appointments - Create new appointment
+// POST /api/appointments - Create new appointment (Handles Blocks)
 export const createAppointment = async (req: Request, res: Response) => {
   try {
-    const { patientId, providerId, date, time, reason }: CreateAppointmentDto = req.body;
+    const { patientId, providerId, date, time, reason, status } = req.body;
+    
+    // Default status if not provided
+    const appointmentStatus = status || 'booked';
 
     // Validation
     if (!patientId || !providerId || !date || !time || !reason) {
@@ -149,15 +136,17 @@ export const createAppointment = async (req: Request, res: Response) => {
       });
     }
 
-    // Check if patient exists
+    // Patient Validation Logic
     const patient = await prisma.user.findUnique({
       where: { id: patientId },
     });
 
-    if (!patient || patient.role !== 'patient') {
+    // ALLOW if status is 'blocked' (Provider booking themselves)
+    // REJECT if normal booking and role is not 'patient'
+    if (!patient || (patient.role !== 'patient' && appointmentStatus !== 'blocked')) {
       return res.status(404).json({
         success: false,
-        message: 'Patient not found',
+        message: 'Patient not found or invalid role for this operation',
       });
     }
 
@@ -173,20 +162,21 @@ export const createAppointment = async (req: Request, res: Response) => {
       });
     }
 
-    // Check for conflicting appointments (same provider, date, time)
+    // Conflict Detection
+    // Check if slot is occupied by EITHER 'booked' OR 'blocked' status
     const conflict = await prisma.appointment.findFirst({
       where: {
         providerId,
         date: new Date(date),
         time,
-        status: 'booked',
+        status: { in: ['booked', 'blocked'] },
       },
     });
 
     if (conflict) {
       return res.status(409).json({
         success: false,
-        message: 'This time slot is already booked',
+        message: 'This time slot is already unavailable',
       });
     }
 
@@ -197,24 +187,12 @@ export const createAppointment = async (req: Request, res: Response) => {
         providerId,
         date: new Date(date),
         time,
-        status: 'booked',
+        status: appointmentStatus,
         reason,
       },
       include: {
-        patient: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        provider: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
+        patient: { select: { id: true, name: true, email: true } },
+        provider: { select: { id: true, name: true, email: true } },
       },
     });
 
@@ -234,7 +212,7 @@ export const createAppointment = async (req: Request, res: Response) => {
 
     res.status(201).json({
       success: true,
-      message: 'Appointment created successfully',
+      message: appointmentStatus === 'blocked' ? 'Time slot blocked successfully' : 'Appointment created successfully',
       data: formatted,
     });
   } catch (error) {
@@ -247,13 +225,13 @@ export const createAppointment = async (req: Request, res: Response) => {
   }
 };
 
-// PATCH /api/appointments/:id - Update appointment
+// PATCH /api/appointments/:id - Update appointment (Updated for Conflict Checks)
 export const updateAppointment = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const updates: UpdateAppointmentDto = req.body;
 
-    // Check if appointment exists
+    // 1. Fetch existing appointment
     const existing = await prisma.appointment.findUnique({
       where: { id: Number(id) },
     });
@@ -265,7 +243,34 @@ export const updateAppointment = async (req: Request, res: Response) => {
       });
     }
 
-    // Build update data
+    // 2. CONFLICT CHECK (Critical Fix)
+    // If date or time is being changed, verify the new slot is empty
+    if (updates.date || updates.time) {
+      const checkDate = updates.date ? new Date(updates.date) : existing.date;
+      const checkTime = updates.time || existing.time;
+      const checkProviderId = existing.providerId; // Provider usually stays same
+
+      const conflict = await prisma.appointment.findFirst({
+        where: {
+          providerId: checkProviderId,
+          date: checkDate,
+          time: checkTime,
+          // Conflict if slot is booked OR blocked
+          status: { in: ['booked', 'blocked'] },
+          // IMPORTANT: Exclude the current appointment ID from the check
+          id: { not: Number(id) } 
+        }
+      });
+
+      if (conflict) {
+        return res.status(409).json({
+          success: false,
+          message: 'The new time slot is already unavailable',
+        });
+      }
+    }
+
+    // 3. Build update data
     const updateData: any = {};
     
     if (updates.date) {
@@ -284,25 +289,13 @@ export const updateAppointment = async (req: Request, res: Response) => {
       updateData.reason = updates.reason;
     }
 
-    // Update appointment
+    // 4. Update appointment
     const updated = await prisma.appointment.update({
       where: { id: Number(id) },
       data: updateData,
       include: {
-        patient: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        provider: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
+        patient: { select: { id: true, name: true, email: true } },
+        provider: { select: { id: true, name: true, email: true } },
       },
     });
 
