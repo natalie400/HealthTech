@@ -25,7 +25,7 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // Validate role
+    // Validate role (Blocks 'admin' registration)
     if (role !== 'patient' && role !== 'provider') {
       return res.status(400).json({
         success: false,

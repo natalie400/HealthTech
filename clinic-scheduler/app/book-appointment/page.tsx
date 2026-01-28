@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { appointmentsAPI, usersAPI } from '@/lib/api';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import toast from 'react-hot-toast'; // Using the standard toast library
+import toast from 'react-hot-toast'; 
 import { Calendar, Clock, User, FileText, Loader2 } from 'lucide-react';
 
 // --- 1. VALIDATION SCHEMA ---

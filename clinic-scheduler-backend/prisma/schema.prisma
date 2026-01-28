@@ -9,19 +9,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User model (both patients and providers)
+// User model (patients, providers, and admins)
 model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   password  String
   name      String
-  role      String   // "patient" or "provider"
+  role      String   // "patient", "provider", "admin"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
+  // 1. Existing Appointment Relations
   patientAppointments  Appointment[] @relation("PatientAppointments")
   providerAppointments Appointment[] @relation("ProviderAppointments")
+
+  // 2. NEW Relations (Fixes the P1012 Error) ✅
+  // These tell Prisma that a User can have many metrics and notes
+  healthMetrics        HealthMetric[]
+  patientNotes         PatientNote[]
 
   @@map("users")
 }
@@ -43,4 +48,30 @@ model Appointment {
   provider User @relation("ProviderAppointments", fields: [providerId], references: [id], onDelete: Cascade)
 
   @@map("appointments")
+}
+
+// New Model: Vital Signs & Health Metrics
+model HealthMetric {
+  id         Int      @id @default(autoincrement())
+  patientId  Int
+  type       String   // e.g., "Heart Rate", "Blood Pressure", "Weight"
+  value      String   // e.g., "72", "120/80", "75"
+  unit       String   // e.g., "bpm", "mmHg", "kg"
+  recordedAt DateTime @default(now())
+
+  // Relation to User
+  patient    User     @relation(fields: [patientId], references: [id])
+}
+
+// New Model: Patient Notes (Symptoms/Feedback)
+model PatientNote {
+  id         Int      @id @default(autoincrement())
+  patientId  Int
+  title      String   // e.g., "Headache symptoms" or "Clinic Feedback"
+  content    String   // The actual note
+  category   String   // "symptom" or "feedback"
+  createdAt  DateTime @default(now())
+
+  // Relation to User
+  patient    User     @relation(fields: [patientId], references: [id])
 }

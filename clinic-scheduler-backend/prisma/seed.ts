@@ -6,27 +6,30 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seed...');
 
-  // Hash password
-  const hashedPassword = await bcrypt.hash('password123', 10);
+  // 1. Define the password you WANT to use
+  // We use the same hash for everyone so it's easy to remember during testing
+  const standardPassword = await bcrypt.hash('password123', 10);
+  const adminPassword = await bcrypt.hash('Password123', 10); // <--- CHANGED: Matches your console log now
 
-  // Create users
+  // 1. Create Patient
   const patient = await prisma.user.upsert({
     where: { email: 'john@example.com' },
     update: {},
     create: {
       email: 'john@example.com',
-      password: hashedPassword,
+      password: standardPassword,
       name: 'John Doe',
       role: 'patient',
     },
   });
 
+  // 2. Create Providers
   const provider1 = await prisma.user.upsert({
     where: { email: 'sarah@clinic.com' },
     update: {},
     create: {
       email: 'sarah@clinic.com',
-      password: hashedPassword,
+      password: standardPassword,
       name: 'Dr. Sarah Smith',
       role: 'provider',
     },
@@ -37,18 +40,32 @@ async function main() {
     update: {},
     create: {
       email: 'mike@clinic.com',
-      password: hashedPassword,
+      password: standardPassword,
       name: 'Dr. Mike Johnson',
       role: 'provider',
     },
   });
 
-  console.log('✅ Users created');
+  // 3. Create DESIGNATED ADMIN (The Security Backdoor) 🔒
+  const adminEmail = 'admin@healthtech.com';
+  await prisma.user.upsert({
+    where: { email: adminEmail },
+    update: {
+      password: adminPassword, // <--- Force update password if user already exists
+    },
+    create: {
+      email: adminEmail,
+      name: 'Master Administrator',
+      password: adminPassword,
+      role: 'admin', // This is the only place 'admin' role is assigned
+    },
+  });
 
-  // Delete existing appointments (to avoid duplicates)
-  await prisma.appointment.deleteMany({});
+  console.log('✅ Users & Admin created');
 
-  // Create appointments
+  // 4. Reset & Create Appointments
+  await prisma.appointment.deleteMany({}); // Clear old appointments to prevent duplicates
+
   await prisma.appointment.createMany({
     data: [
       {
@@ -81,9 +98,12 @@ async function main() {
   console.log('✅ Appointments created');
   console.log('');
   console.log('📧 Test credentials:');
-  console.log('   Patient: john@example.com / password123');
+  console.log('   Patient:  john@example.com / password123');
   console.log('   Provider: sarah@clinic.com / password123');
-  console.log('   Provider: mike@clinic.com / password123');
+  console.log('   Provider: mike@clinic.com  / password123');
+  console.log('   ----------------------------------------');
+  console.log('   🛡️ ADMIN:   admin@healthtech.com');
+  console.log('   🔑 PASS:    Password123');
 }
 
 main()

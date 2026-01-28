@@ -142,6 +142,10 @@ export const appointmentsAPI = {
   },
 };
 
+export const adminAPI = {
+  getStats: () => fetchWithAuth('/api/admin/stats'),
+  getUsers: () => fetchWithAuth('/api/admin/users'),
+};
 export const usersAPI = {
   getProviders: async () => {
     const response = await fetch(`${API_URL}/api/users/providers`);

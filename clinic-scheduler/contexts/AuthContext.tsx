@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { User } from '@/lib/types';
 import { authAPI } from '@/lib/api';
 
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
   // Load user from token on mount
   useEffect(() => {
@@ -40,13 +42,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser();
   }, []);
 
-  // Login function - calls real API
+  // Login function - calls real API and handles Redirects
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       const response = await authAPI.login(email, password);
       
       if (response.success && response.data?.user) {
-        setUser(response.data.user);
+        // 1. Save Token (Critical for persistence)
+        if (response.data.token) {
+            localStorage.setItem('token', response.data.token);
+        }
+
+        // 2. Set User State
+        const userData = response.data.user;
+        setUser(userData);
+
+        // 3. Traffic Cop Redirect Logic 🚦
+        if (userData.role === 'admin') {
+          router.push('/admin/dashboard');
+        } else if (userData.role === 'provider') {
+          router.push('/provider/schedule');
+        } else {
+          router.push('/dashboard'); // Patient
+        }
+
         return true;
       }
       
@@ -60,7 +79,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Logout function
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('token'); // Ensure token is cleared
     authAPI.logout();
+    router.push('/login'); // Redirect to login on logout
   };
 
   return (

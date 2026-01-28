@@ -1,52 +1,53 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/db';
-import { CreateAppointmentDto, UpdateAppointmentDto } from '../types';
 
-// GET /api/appointments - Get all appointments
+// Helper to validate business hours (e.g., 8 AM to 5 PM)
+const isBusinessHour = (timeString: string) => {
+  const hour = parseInt(timeString.split(':')[0]);
+  return hour >= 8 && hour <= 17;
+};
+
+// GET /api/appointments - Secured with RBAC 🛡️
 export const getAllAppointments = async (req: Request, res: Response) => {
   try {
-    const { patientId, providerId, status } = req.query;
+    // 1. Get the logged-in user's details (attached by middleware)
+    // We cast to 'any' because Express Request doesn't know about our custom JWT fields yet
+    const user = (req as any); 
+    const role = user.role;
+    const userId = user.userId;
 
-    // Build filter conditions
+    // 2. Start with an empty filter
     const where: any = {};
-    
-    if (patientId) {
-      where.patientId = Number(patientId);
-    }
-    
-    if (providerId) {
-      where.providerId = Number(providerId);
-    }
-    
-    if (status) {
-      where.status = status as string;
-    }
 
-    // Fetch from database with relations
+    // 3. ENFORCE ROLE-BASED ACCESS (Requirement #3)
+    // "As the system, I want to enforce role-based access"
+    if (role === 'patient') {
+      where.patientId = userId; // Patient can ONLY see their own
+    } else if (role === 'provider') {
+      where.providerId = userId; // Provider can ONLY see their own
+    } 
+    // Admin (or others) bypasses this and can see all (or use query params below)
+
+    // 4. Apply optional filters (only if they don't conflict with forced roles)
+    const { patientId, providerId, status } = req.query;
+    
+    // If Admin wants to filter by specific people:
+    if (role === 'admin') {
+      if (patientId) where.patientId = Number(patientId);
+      if (providerId) where.providerId = Number(providerId);
+    }
+    if (status) where.status = status as string;
+
     const appointments = await prisma.appointment.findMany({
       where,
       include: {
-        patient: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        provider: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
+        patient: { select: { id: true, name: true, email: true } },
+        provider: { select: { id: true, name: true, email: true } },
       },
-      orderBy: {
-        date: 'desc',
-      },
+      orderBy: { date: 'desc' },
     });
 
-    // Format response
+    // Format response (Flattening the data)
     const formatted = appointments.map(apt => ({
       id: apt.id,
       patientId: apt.patientId,
@@ -61,312 +62,136 @@ export const getAllAppointments = async (req: Request, res: Response) => {
       updatedAt: apt.updatedAt,
     }));
 
-    res.json({
-      success: true,
-      count: formatted.length,
-      data: formatted,
-    });
+    res.json({ success: true, count: formatted.length, data: formatted });
   } catch (error) {
     console.error('Error fetching appointments:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching appointments',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    res.status(500).json({ success: false, message: 'Error fetching appointments' });
   }
 };
 
-// GET /api/appointments/:id - Get single appointment
+// GET /api/appointments/:id - Secured 🛡️
 export const getAppointmentById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const user = (req as any);
 
     const appointment = await prisma.appointment.findUnique({
       where: { id: Number(id) },
       include: {
-        patient: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        provider: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
+        patient: { select: { id: true, name: true, email: true } },
+        provider: { select: { id: true, name: true, email: true } },
       },
     });
 
-    if (!appointment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Appointment not found',
-      });
+    if (!appointment) return res.status(404).json({ success: false, message: 'Not found' });
+
+    // RBAC Check for Single Item
+    if (user.role === 'patient' && appointment.patientId !== user.userId) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    if (user.role === 'provider' && appointment.providerId !== user.userId) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const formatted = {
-      id: appointment.id,
-      patientId: appointment.patientId,
-      patientName: appointment.patient.name,
-      providerId: appointment.providerId,
-      providerName: appointment.provider.name,
-      date: appointment.date.toISOString().split('T')[0],
-      time: appointment.time,
-      status: appointment.status,
-      reason: appointment.reason,
-      createdAt: appointment.createdAt,
-      updatedAt: appointment.updatedAt,
-    };
-
-    res.json({
-      success: true,
-      data: formatted,
-    });
+    res.json({ success: true, data: appointment });
   } catch (error) {
-    console.error('Error fetching appointment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching appointment',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    res.status(500).json({ success: false, message: 'Error fetching appointment' });
   }
 };
 
-// POST /api/appointments - Create new appointment
+// POST /api/appointments - Validated & Conflict Checked 🛡️
 export const createAppointment = async (req: Request, res: Response) => {
   try {
-    const { patientId, providerId, date, time, reason }: CreateAppointmentDto = req.body;
+    const { patientId, providerId, date, time, reason } = req.body;
 
-    // Validation
+    // 1. INPUT VALIDATION (Requirement #2)
+    // "As the system, I want to validate all inputs"
     if (!patientId || !providerId || !date || !time || !reason) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields: patientId, providerId, date, time, reason',
-      });
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
-    // Check if patient exists
-    const patient = await prisma.user.findUnique({
-      where: { id: patientId },
-    });
-
-    if (!patient || patient.role !== 'patient') {
-      return res.status(404).json({
-        success: false,
-        message: 'Patient not found',
-      });
+    // Date Validation: No past dates
+    const appointmentDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day
+    if (appointmentDate < today) {
+      return res.status(400).json({ success: false, message: 'Cannot book appointments in the past' });
     }
 
-    // Check if provider exists
-    const provider = await prisma.user.findUnique({
-      where: { id: providerId },
-    });
+    // Time Validation: Business hours only (Simple check)
+    // if (!isBusinessHour(time)) {
+    //   return res.status(400).json({ success: false, message: 'Please select a time between 8 AM and 5 PM' });
+    // }
 
-    if (!provider || provider.role !== 'provider') {
-      return res.status(404).json({
-        success: false,
-        message: 'Provider not found',
-      });
-    }
-
-    // Check for conflicting appointments (same provider, date, time)
+    // 2. PREVENT DOUBLE BOOKING (Requirement #1)
+    // "As the system, I want to prevent double-booking"
     const conflict = await prisma.appointment.findFirst({
       where: {
         providerId,
-        date: new Date(date),
+        date: appointmentDate,
         time,
-        status: 'booked',
+        status: { in: ['booked', 'confirmed'] }, // Check strictly for taken slots
       },
     });
 
     if (conflict) {
-      return res.status(409).json({
-        success: false,
-        message: 'This time slot is already booked',
+      return res.status(409).json({ 
+        success: false, 
+        message: 'This time slot is already double-booked. Please choose another.' 
       });
     }
 
-    // Create appointment
     const newAppointment = await prisma.appointment.create({
       data: {
         patientId,
         providerId,
-        date: new Date(date),
+        date: appointmentDate,
         time,
         status: 'booked',
         reason,
       },
       include: {
-        patient: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        provider: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
+        patient: { select: { id: true, name: true } },
+        provider: { select: { id: true, name: true } }
+      }
     });
 
-    const formatted = {
-      id: newAppointment.id,
-      patientId: newAppointment.patientId,
-      patientName: newAppointment.patient.name,
-      providerId: newAppointment.providerId,
-      providerName: newAppointment.provider.name,
-      date: newAppointment.date.toISOString().split('T')[0],
-      time: newAppointment.time,
-      status: newAppointment.status,
-      reason: newAppointment.reason,
-      createdAt: newAppointment.createdAt,
-      updatedAt: newAppointment.updatedAt,
-    };
-
-    res.status(201).json({
-      success: true,
-      message: 'Appointment created successfully',
-      data: formatted,
-    });
+    res.status(201).json({ success: true, message: 'Appointment booked successfully', data: newAppointment });
   } catch (error) {
     console.error('Error creating appointment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error creating appointment',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    res.status(500).json({ success: false, message: 'Error creating appointment' });
   }
 };
 
-// PATCH /api/appointments/:id - Update appointment
+// PATCH /api/appointments/:id
 export const updateAppointment = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const updates: UpdateAppointmentDto = req.body;
-
-    // Check if appointment exists
-    const existing = await prisma.appointment.findUnique({
-      where: { id: Number(id) },
-    });
-
-    if (!existing) {
-      return res.status(404).json({
-        success: false,
-        message: 'Appointment not found',
-      });
-    }
-
-    // Build update data
-    const updateData: any = {};
+    const updates = req.body;
     
-    if (updates.date) {
-      updateData.date = new Date(updates.date);
-    }
-    
-    if (updates.time) {
-      updateData.time = updates.time;
-    }
-    
-    if (updates.status) {
-      updateData.status = updates.status;
-    }
-    
-    if (updates.reason) {
-      updateData.reason = updates.reason;
-    }
+    // Basic existence check
+    const existing = await prisma.appointment.findUnique({ where: { id: Number(id) } });
+    if (!existing) return res.status(404).json({ success: false, message: 'Not found' });
 
-    // Update appointment
+    if (updates.date) updates.date = new Date(updates.date);
+
     const updated = await prisma.appointment.update({
       where: { id: Number(id) },
-      data: updateData,
-      include: {
-        patient: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        provider: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
+      data: updates,
     });
-
-    const formatted = {
-      id: updated.id,
-      patientId: updated.patientId,
-      patientName: updated.patient.name,
-      providerId: updated.providerId,
-      providerName: updated.provider.name,
-      date: updated.date.toISOString().split('T')[0],
-      time: updated.time,
-      status: updated.status,
-      reason: updated.reason,
-      createdAt: updated.createdAt,
-      updatedAt: updated.updatedAt,
-    };
-
-    res.json({
-      success: true,
-      message: 'Appointment updated successfully',
-      data: formatted,
-    });
+    res.json({ success: true, data: updated });
   } catch (error) {
-    console.error('Error updating appointment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating appointment',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    res.status(500).json({ success: false, message: 'Error updating' });
   }
 };
 
-// DELETE /api/appointments/:id - Delete appointment
+// DELETE /api/appointments/:id
 export const deleteAppointment = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-
-    // Check if appointment exists
-    const existing = await prisma.appointment.findUnique({
-      where: { id: Number(id) },
-    });
-
-    if (!existing) {
-      return res.status(404).json({
-        success: false,
-        message: 'Appointment not found',
-      });
-    }
-
-    // Delete appointment
-    await prisma.appointment.delete({
-      where: { id: Number(id) },
-    });
-
-    res.json({
-      success: true,
-      message: 'Appointment deleted successfully',
-    });
+    await prisma.appointment.delete({ where: { id: Number(id) } });
+    res.json({ success: true, message: 'Deleted' });
   } catch (error) {
-    console.error('Error deleting appointment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting appointment',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    res.status(500).json({ success: false, message: 'Error deleting' });
   }
 };

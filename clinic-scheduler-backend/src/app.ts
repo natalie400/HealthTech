@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import appointmentRoutes from './routes/appointmentRoutes';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
-
+// import adminRoutes from './routes/adminRoutes';
 dotenv.config();
 
 const app: Application = express();
@@ -37,16 +37,17 @@ app.get('/', (req: Request, res: Response) => {
       auth: '/api/auth',
       users: '/api/users',
       appointments: '/api/appointments',
+      // admin: '/api/admin'
     }
   });
 });
 
-// Routes (The Stations in the Kitchen)
+// Routes 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/appointments', appointmentRoutes);
-
-// 404 handler (If they order something not on the menu)
+// app.use('/api/admin', adminRoutes);
+// 404 handler
 app.use((req: Request, res: Response) => {
   res.status(404).json({ 
     error: 'Not Found',

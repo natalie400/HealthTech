@@ -17,4 +17,5 @@ export interface Appointment {
   time: string;
   status: 'booked' | 'cancelled' | 'completed';
   reason: string;
+  
 }
