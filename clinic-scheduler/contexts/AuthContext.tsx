@@ -19,56 +19,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // Load user from token on mount
   useEffect(() => {
     const loadUser = async () => {
       const token = localStorage.getItem('token');
-      
       if (token) {
         try {
           const response = await authAPI.getCurrentUser();
-          if (response.success && response.data) {
-            setUser(response.data);
-          }
+          if (response.success && response.data) setUser(response.data);
         } catch (error) {
-          console.error('Error loading user:', error);
           localStorage.removeItem('token');
         }
       }
-      
       setIsLoading(false);
     };
-
     loadUser();
   }, []);
 
-  // Login function - calls real API and handles Redirects
+  // ✅ FIX: Wraps arguments into an object { email, password }
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const response = await authAPI.login(email, password);
+      const response = await authAPI.login({ email, password });
       
       if (response.success && response.data?.user) {
-        // 1. Save Token (Critical for persistence)
-        if (response.data.token) {
-            localStorage.setItem('token', response.data.token);
-        }
-
-        // 2. Set User State
+        if (response.data.token) localStorage.setItem('token', response.data.token);
+        
         const userData = response.data.user;
         setUser(userData);
 
-        // 3. Traffic Cop Redirect Logic 🚦
-        if (userData.role === 'admin') {
-          router.push('/admin/dashboard');
-        } else if (userData.role === 'provider') {
-          router.push('/provider/schedule');
-        } else {
-          router.push('/dashboard'); // Patient
-        }
+        if (userData.role === 'admin') router.push('/admin/dashboard');
+        else if (userData.role === 'provider') router.push('/provider/schedule');
+        else router.push('/dashboard');
 
         return true;
       }
-      
       return false;
     } catch (error) {
       console.error('Login error:', error);
@@ -76,12 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Logout function
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('token'); // Ensure token is cleared
+    localStorage.removeItem('token');
     authAPI.logout();
-    router.push('/login'); // Redirect to login on logout
+    router.push('/login');
   };
 
   return (
@@ -91,11 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Custom hook to use auth context
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (context === undefined) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }

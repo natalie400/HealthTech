@@ -6,12 +6,11 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seed...');
 
-  // 1. Define the password you WANT to use
-  // We use the same hash for everyone so it's easy to remember during testing
+  // 1. Define standard passwords
   const standardPassword = await bcrypt.hash('password123', 10);
-  const adminPassword = await bcrypt.hash('Password123', 10); // <--- CHANGED: Matches your console log now
+  const adminPassword = await bcrypt.hash('Password123', 10);
 
-  // 1. Create Patient
+  // 2. Create Patient
   const patient = await prisma.user.upsert({
     where: { email: 'john@example.com' },
     update: {},
@@ -23,7 +22,7 @@ async function main() {
     },
   });
 
-  // 2. Create Providers
+  // 3. Create Providers
   const provider1 = await prisma.user.upsert({
     where: { email: 'sarah@clinic.com' },
     update: {},
@@ -46,26 +45,27 @@ async function main() {
     },
   });
 
-  // 3. Create DESIGNATED ADMIN (The Security Backdoor) 🔒
+  // 4. Create DESIGNATED ADMIN
   const adminEmail = 'admin@healthtech.com';
   await prisma.user.upsert({
     where: { email: adminEmail },
-    update: {
-      password: adminPassword, // <--- Force update password if user already exists
-    },
+    update: { password: adminPassword },
     create: {
       email: adminEmail,
       name: 'Master Administrator',
       password: adminPassword,
-      role: 'admin', // This is the only place 'admin' role is assigned
+      role: 'admin',
     },
   });
 
   console.log('✅ Users & Admin created');
 
-  // 4. Reset & Create Appointments
-  await prisma.appointment.deleteMany({}); // Clear old appointments to prevent duplicates
+  // 5. Reset Data (Clear old records to avoid duplicates)
+  await prisma.patientNote.deleteMany({});
+  await prisma.healthMetric.deleteMany({});
+  await prisma.appointment.deleteMany({});
 
+  // 6. Create Appointments
   await prisma.appointment.createMany({
     data: [
       {
@@ -94,8 +94,70 @@ async function main() {
       },
     ],
   });
-
   console.log('✅ Appointments created');
+
+  // 7. Create Health Metrics (The Missing Piece! 📊)
+  // We explicitly create these so the dashboard chart has data to render
+  await prisma.healthMetric.createMany({
+    data: [
+      { 
+        patientId: patient.id, 
+        type: 'Heart Rate', 
+        value: '72', 
+        unit: 'bpm', 
+        recordedAt: new Date('2025-12-01') 
+      },
+      { 
+        patientId: patient.id, 
+        type: 'Heart Rate', 
+        value: '75', 
+        unit: 'bpm', 
+        recordedAt: new Date('2025-12-15') 
+      },
+      { 
+        patientId: patient.id, 
+        type: 'Heart Rate', 
+        value: '70', 
+        unit: 'bpm', 
+        recordedAt: new Date('2026-01-05') 
+      },
+      { 
+        patientId: patient.id, 
+        type: 'Heart Rate', 
+        value: '85', 
+        unit: 'bpm', 
+        recordedAt: new Date('2026-01-20') 
+      },
+      { 
+        patientId: patient.id, 
+        type: 'Weight', 
+        value: '70', 
+        unit: 'kg', 
+        recordedAt: new Date('2025-12-01') 
+      },
+    ],
+  });
+  console.log('✅ Health Metrics created');
+
+  // 8. Create Patient Notes 📝
+  await prisma.patientNote.createMany({
+    data: [
+      { 
+        patientId: patient.id, 
+        title: 'Recurring Migraines', 
+        content: 'I have been having headaches every morning for 3 days.', 
+        category: 'symptom' 
+      },
+      { 
+        patientId: patient.id, 
+        title: 'Great Service', 
+        content: 'Dr. Sarah was very kind during my last visit.', 
+        category: 'feedback' 
+      },
+    ],
+  });
+  console.log('✅ Patient Notes created');
+
   console.log('');
   console.log('📧 Test credentials:');
   console.log('   Patient:  john@example.com / password123');

@@ -1,277 +1,213 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
-import AppointmentCard from '@/components/AppointmentCard';
-import { appointmentsAPI } from '@/lib/api';
-import LoadingSpinner from '@/components/LoadingSpinner';
-import SkeletonCard from '@/components/SkeletonCard';
-import ErrorBoundary from '@/components/ErrorBoundary';
-import Link from 'next/link';
-import { CalendarDays, CheckCircle2, BarChart2 } from 'lucide-react';
+import { patientAPI } from '@/lib/api';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Activity, Plus, Save, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
-export default function Dashboard() {
+export default function PatientDashboard() {
   const { user } = useAuth();
-  const [appointments, setAppointments] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Data State - Initialize as empty arrays to prevent "filter of undefined" errors
+  const [metrics, setMetrics] = useState<any[]>([]);
+  const [notes, setNotes] = useState<any[]>([]);
+  
+  // Form State
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [newNote, setNewNote] = useState({ title: '', content: '', category: 'symptom' });
 
-  // Fetch appointments from API
+  // 1. Fetch Data on Load
   useEffect(() => {
-    const fetchAppointments = async () => {
-      if (!user) return;
-
+    async function fetchData() {
       try {
-        setIsLoading(true);
-        setError(null);
+        const [metricsRes, notesRes] = await Promise.all([
+          patientAPI.getMetrics(),
+          patientAPI.getNotes()
+        ]);
 
-        const params = user.role === 'patient' 
-          ? { patientId: user.id }
-          : { providerId: user.id };
+        // ✅ FIX: Removed the extra .data because we are using Fetch now
+        setMetrics(metricsRes.data || []); 
+        setNotes(notesRes.data || []);
 
-        const response = await appointmentsAPI.getAll(params);
-
-        if (response.success) {
-          setAppointments(response.data || []);
-        }
-      } catch (err) {
-        console.error('Error fetching appointments:', err);
-        setError('Failed to load appointments');
+      } catch (error) {
+        console.error(error);
+        toast.error('Failed to load health data');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
-    };
-
-    fetchAppointments();
+    }
+    if (user) fetchData();
   }, [user]);
 
-  if (!user) return null;
+  // 2. Handle Form Submit
+  const handleSubmitNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await patientAPI.addNote(newNote);
+      // ✅ FIX: Handle the response structure for the new note too
+      const createdNote = res.data || res; 
+      setNotes([createdNote, ...notes]);
+      
+      setNewNote({ title: '', content: '', category: 'symptom' });
+      setShowNoteForm(false);
+      toast.success('Note added successfully');
+    } catch (error) {
+      toast.error('Failed to save note');
+    }
+  };
 
-  // Show loading state
-  if (isLoading) {
-    return (
-      <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="mb-8 animate-pulse">
-              <div className="h-8 bg-gray-200 rounded w-64 mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded w-96"></div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-white rounded-lg shadow p-6 animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
-                  <div className="h-10 bg-gray-200 rounded w-16"></div>
-                </div>
-              ))}
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map((i) => (
-                <SkeletonCard key={i} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-              <p className="text-red-600 mb-4">{error}</p>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                Retry
-              </button>
-            </div>
-          </div>
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
-  // Split into upcoming and past
-  const today = new Date().toISOString().split('T')[0];
-  
-  const upcomingAppointments = appointments.filter(
-    apt => apt && apt.date >= today && apt.status === 'booked'
-  );
-  const pastAppointments = appointments.filter(
-    apt => apt && (apt.date < today || apt.status === 'completed')
-  );
+  // Helper: Prepare Chart Data (Safety check added: (metrics || []))
+  const heartRateData = (metrics || [])
+    .filter((m: any) => m.type === 'Heart Rate')
+    .map((m: any) => ({
+      date: new Date(m.recordedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      value: parseInt(m.value),
+    }));
 
   return (
-    <ErrorBoundary>
-      <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 py-8">
-            {/* Welcome Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Welcome back, {user.name}!
-              </h1>
-              <p className="text-gray-600">
-                {user.role === 'patient' 
-                  ? 'Manage your appointments and health information'
-                  : 'View and manage your patient appointments'
-                }
-              </p>
-            </div>
+    <ProtectedRoute requiredRole="patient">
+      <div className="min-h-screen bg-slate-50 p-8">
+        <div className="max-w-6xl mx-auto space-y-8">
+           
+          {/* Header */}
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">My Health Portal</h1>
+            <p className="text-slate-500">Welcome back, {user?.name}</p>
+          </div>
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-white text-gray-900 rounded-lg shadow-lg p-6 flex items-center justify-between border border-gray-200">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Upcoming</p>
-                  <p className="text-3xl font-bold">{upcomingAppointments.length}</p>
-                </div>
-                <CalendarDays className="w-10 h-10 text-blue-500 opacity-80" />
-              </div>
-
-              <div className="bg-white text-gray-900 rounded-lg shadow-lg p-6 flex items-center justify-between border border-gray-200">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Completed</p>
-                  <p className="text-3xl font-bold">
-                    {appointments.filter(apt => apt && apt.status === 'completed').length}
-                  </p>
-                </div>
-                <CheckCircle2 className="w-10 h-10 text-green-500 opacity-80" />
-              </div>
-
-              <div className="bg-white text-gray-900 rounded-lg shadow-lg p-6 flex items-center justify-between border border-gray-200">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Total</p>
-                  <p className="text-3xl font-bold">{appointments.length}</p>
-                </div>
-                <BarChart2 className="w-10 h-10 text-purple-500 opacity-80" />
-              </div>
-            </div>
-
-            {/* Role-specific Quick Actions */}
-            {user.role === 'patient' && (
-              <div className="bg-white rounded-lg shadow p-6 mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Link
-                    href="/book-appointment"
-                    className="flex items-center gap-3 p-4 border-2 border-blue-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
-                  >
-                    <span className="text-3xl">➕</span>
-                    <div>
-                      <p className="font-medium text-gray-900">Book Appointment</p>
-                      <p className="text-sm text-gray-600">Schedule a new visit</p>
+          {loading ? (
+             <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600"/></div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+               
+              {/* LEFT COLUMN: Vitals Chart */}
+              <div className="lg:col-span-2 space-y-8">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-red-50 text-red-600 rounded-lg">
+                      <Activity className="w-6 h-6" />
                     </div>
-                  </Link>
-
-                  <Link
-                    href="/appointments"
-                    className="flex items-center gap-3 p-4 border-2 border-green-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-colors"
-                  >
-                    <span className="text-3xl">📋</span>
-                    <div>
-                      <p className="font-medium text-gray-900">View All</p>
-                      <p className="text-sm text-gray-600">See appointment history</p>
-                    </div>
-                  </Link>
-
-                  <div className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg opacity-50 cursor-not-allowed">
-                    <span className="text-3xl">💬</span>
-                    <div>
-                      <p className="font-medium text-gray-900">Messages</p>
-                      <p className="text-sm text-gray-600">Coming soon</p>
-                    </div>
+                    <h2 className="text-xl font-bold text-slate-900">Heart Rate History</h2>
+                  </div>
+                  
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={heartRateData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                        <XAxis dataKey="date" stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="value" 
+                          stroke="#EF4444" 
+                          strokeWidth={3} 
+                          dot={{ r: 4, fill: '#EF4444', strokeWidth: 2, stroke: '#fff' }} 
+                          activeDot={{ r: 6 }} 
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {user.role === 'provider' && (
-              <div className="bg-white rounded-lg shadow p-6 mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Link
-                    href="/provider/schedule"
-                    className="flex items-center gap-3 p-4 border-2 border-purple-200 rounded-lg hover:border-purple-400 hover:bg-purple-50 transition-colors"
+                 {/* Recent Metrics List */}
+                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                    <h3 className="font-bold text-slate-900 mb-4">Recent Vitals Log</h3>
+                    <div className="space-y-3">
+                      {(metrics || []).slice(0, 3).map((m: any) => (
+                        <div key={m.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
+                          <span className="font-medium text-slate-700">{m.type}</span>
+                          <span className="font-bold text-slate-900">{m.value} <span className="text-sm font-normal text-slate-500">{m.unit}</span></span>
+                        </div>
+                      ))}
+                    </div>
+                 </div>
+              </div>
+
+              {/* RIGHT COLUMN: Notes & Feedback */}
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-3xl font-bold text-slate-900">My Notes</h2>
+                  <button 
+                    onClick={() => setShowNoteForm(!showNoteForm)}
+                    className="flex items-center gap-2 text-lg bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-sm"
                   >
-                    <span className="text-3xl">📅</span>
-                    <div>
-                      <p className="font-medium text-gray-900">My Schedule</p>
-                      <p className="text-sm text-gray-600">View detailed schedule</p>
-                    </div>
-                  </Link>
-
-                  <div className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg opacity-50 cursor-not-allowed">
-                    <span className="text-3xl">⚙️</span>
-                    <div>
-                      <p className="font-medium text-gray-900">Availability</p>
-                      <p className="text-sm text-gray-600">Coming soon</p>
-                    </div>
-                  </div>
+                    <Plus className="w-5 h-5" /> Add Note
+                  </button>
                 </div>
-              </div>
-            )}
 
-            {/* Upcoming Appointments */}
-            <section className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-semibold text-gray-800">
-                  Upcoming Appointments
-                </h2>
-                {upcomingAppointments.length > 3 && (
-                  <Link href="/appointments" className="text-blue-600 hover:text-blue-700 font-medium">
-                    View All →
-                  </Link>
+                {/* Add Note Form */}
+                {showNoteForm && (
+                  <form onSubmit={handleSubmitNote} className="bg-white p-6 rounded-xl shadow-lg border border-slate-100 animate-in fade-in slide-in-from-top-4">
+                    <div className="space-y-5">
+                      <input 
+                        type="text" 
+                        placeholder="Title (e.g., Morning Headache)" 
+                        className="w-full p-3 text-lg border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-slate-900 placeholder:text-slate-400"
+                        value={newNote.title}
+                        onChange={(e) => setNewNote({...newNote, title: e.target.value})}
+                        required
+                      />
+                      <select 
+                        className="w-full p-3 text-lg border border-slate-200 rounded-lg outline-none bg-white text-slate-900"
+                        value={newNote.category}
+                        onChange={(e) => setNewNote({...newNote, category: e.target.value})}
+                      >
+                        <option value="symptom">Symptom</option>
+                        <option value="feedback">Clinic Feedback</option>
+                        <option value="question">Question for Doctor</option>
+                      </select>
+                      <textarea 
+                        placeholder="Describe how you feel..." 
+                        rows={3}
+                        className="w-full p-3 text-lg border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-white text-slate-900 placeholder:text-slate-400"
+                        value={newNote.content}
+                        onChange={(e) => setNewNote({...newNote, content: e.target.value})}
+                        required
+                      />
+                      <button type="submit" className="w-full flex items-center justify-center gap-2 bg-slate-900 text-white py-3 text-lg font-medium rounded-lg hover:bg-black transition-colors">
+                        <Save className="w-5 h-5" /> Save Note
+                      </button>
+                    </div>
+                  </form>
                 )}
-              </div>
-              
-              {upcomingAppointments.length > 0 ? (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {upcomingAppointments.slice(0, 3).map((appointment, index) => (
-                    <AppointmentCard key={appointment?.id || index} appointment={appointment} />
-                  ))}
-                </div>
-              ) : (
-                <div className="bg-white p-12 rounded-lg text-center">
-                  <div className="text-6xl mb-4">📭</div>
-                  <p className="text-gray-600 text-lg mb-2">No upcoming appointments</p>
-                  {user.role === 'patient' && (
-                    <Link
-                      href="/book-appointment"
-                      className="inline-block mt-4 px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      Book Your First Appointment
-                    </Link>
+
+                {/* Notes List */}
+                <div className="space-y-5 max-h-[600px] overflow-y-auto pr-2">
+                  {(notes || []).length === 0 ? (
+                    <p className="text-slate-400 text-center text-lg py-8">No notes recorded yet.</p>
+                  ) : (
+                    notes.map((note: any) => (
+                      <div key={note.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 group hover:border-blue-200 transition-colors">
+                        <div className="flex justify-between items-start mb-3">
+                          <span className={`px-3 py-1 rounded text-sm font-bold uppercase tracking-wide ${
+                            note.category === 'symptom' ? 'bg-orange-50 text-orange-600' : 
+                            note.category === 'feedback' ? 'bg-purple-50 text-purple-600' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {note.category}
+                          </span>
+                          <span className="text-sm text-slate-400 font-medium">
+                            {new Date(note.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-slate-900 mb-2">{note.title}</h3>
+                        <p className="text-lg text-slate-600 leading-relaxed">{note.content}</p>
+                      </div>
+                    ))
                   )}
                 </div>
-              )}
-            </section>
+              </div>
 
-            {/* Recent/Past Appointments */}
-            {pastAppointments.length > 0 && (
-              <section>
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-                  Recent Appointments
-                </h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {pastAppointments.slice(0, 3).map((appointment, index) => (
-                    <AppointmentCard key={appointment?.id || index} appointment={appointment} />
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-      </ProtectedRoute>
-    </ErrorBoundary>
+      </div>
+    </ProtectedRoute>
   );
 }
